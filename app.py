@@ -2,6 +2,7 @@ import os
 
 #from cs50 import SQL
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from flask import Flask, flash, redirect, render_template, request, session, jsonify
 from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -22,12 +23,11 @@ app.config["SESSION_TYPE"] = "filesystem"
 Session(app)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///finance.db'
-
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 ''' Configure CS50 Library to use SQLite database
 db = SQL("sqlite:///finance.db")'''
-
-db = SQLAlchemy(app)
 
 
 @app.after_request
@@ -48,18 +48,18 @@ alert_end = '</div>'
 def index():
     """Show portfolio of stocks"""
     user_id = session["user_id"]
-    transactions = db.execute(
-        "SELECT symbol, SUM(shares) AS shares, price, SUM(shares)*price AS balance FROM transactions WHERE user_id = ? GROUP BY symbol", user_id)
+    transactions = db.session.execute(
+        "SELECT symbol, SUM(shares) AS shares, price, SUM(shares)*price AS balance FROM transactions WHERE user_id = :user_id GROUP BY symbol", {"user_id" : user_id})
     # return jsonify(transactions): helps to understand that transactions is a list of ditionaries
     # eg: [{"price":428.74,"shares":5,"symbol":"MSFT"}]
 
     # Cash from database eg: [{"cash":7856.3}]
-    username_db = db.execute("SELECT username FROM users WHERE id = ?", user_id)
+    username_db = db.session.execute("SELECT username FROM users WHERE id = :user_id", {"user_id" : user_id})
     username = username_db[0]["username"]
-    cash_balance = db.execute("SELECT cash FROM users WHERE id = ?", user_id)
+    cash_balance = db.session.execute("SELECT cash FROM users WHERE id = :user_id", {"user_id" : user_id})
     cash = cash_balance[0]["cash"]
-    total_transactions = db.execute(
-        "SELECT SUM(total_balance) AS grand_total FROM (SELECT SUM(shares) * price AS total_balance from transactions WHERE user_id = ? GROUP BY symbol)", user_id)
+    total_transactions = db.session.execute(
+        "SELECT SUM(total_balance) AS grand_total FROM (SELECT SUM(shares) * price AS total_balance from transactions WHERE user_id = :user_id GROUP BY symbol)", {"user_id" : user_id})
     grand_total = 0
     grand_total = total_transactions[0]["grand_total"]
     if not grand_total:  # check if grand_total is None
@@ -97,7 +97,7 @@ def buy():
 
         user_id = session["user_id"]
         transaction_value = shares * stock["price"]  # i.e. total amount to buy the shares
-        user_cash_balance = db.execute("SELECT cash FROM users WHERE id = ?", user_id)
+        user_cash_balance = db.session.execute("SELECT cash FROM users WHERE id = ?", user_id)
         # jsonify helps here : jsonify(user_cash_balance)
         user_cash = user_cash_balance[0]["cash"]
 
@@ -105,10 +105,13 @@ def buy():
             return apology("Cannot afford")
 
         updated_cash = user_cash - transaction_value
-        db.execute("UPDATE users SET cash = ? WHERE id = ?", updated_cash, user_id)
+        db.session.execute(
+            "UPDATE users SET cash = :updated_cash WHERE id = :user_id",
+            {"updated_cash": updated_cash, "user_id": user_id}
+        )
 
         date = datetime.datetime.now()
-        db.execute("INSERT INTO transactions (user_id, symbol, shares, price, date, total) VALUES (?, ?, ?, ?, ?, ?)",
+        db.session.execute("INSERT INTO transactions (user_id, symbol, shares, price, date, total) VALUES (?, ?, ?, ?, ?, ?)",
                    user_id, symbol, shares, stock["price"], date, transaction_value)
 
         flash("Bought!")
@@ -124,8 +127,8 @@ def buy():
 def history():
     """Show history of transactions"""
     user_id = session["user_id"]
-    transactions = db.execute(
-        "SELECT symbol, shares, price, date FROM transactions WHERE user_id = ?", user_id)
+    transactions = db.session.execute(
+        "SELECT symbol, shares, price, date FROM transactions WHERE user_id = :user_id", {"user_id" : user_id})
     return render_template("history.html", transactions=transactions)
 
 
@@ -147,9 +150,9 @@ def login():
             return apology("must provide password", 403)
 
         # Query database for username
-        rows = db.execute(
-            "SELECT * FROM users WHERE username = ?", request.form.get("username")
-        )
+        rows = db.session.execute(
+            "SELECT * FROM users WHERE username = :username", {"username" : request.form.get("username")})
+        
 
         # Ensure username exists and password is correct
         if len(rows) != 1 or not check_password_hash(
@@ -233,7 +236,7 @@ def register():
 
         try:
             # Add username to the database
-            db.execute(
+            db.session.execute(
                 "INSERT INTO users (username, hash) VALUES( ?, ?)", username, hash
             )
         except:
@@ -271,20 +274,20 @@ def sell():
         transaction_value = shares * stock["price"]
         user_id = session["user_id"]
 
-        existing_shares_db = db.execute(
-            "SELECT SUM(shares) AS shares FROM transactions WHERE user_id = ? AND symbol = ? GROUP BY symbol", user_id, symbol)
+        existing_shares_db = db.session.execute(
+            "SELECT SUM(shares) AS shares FROM transactions WHERE user_id = :user_id AND symbol = :symbol GROUP BY symbol", {"user_id" : user_id, "symbol" : symbol})
         existing_shares = existing_shares_db[0]["shares"]
         if shares > existing_shares:
             return apology("Too many shares!", 400)
 
-        user_cash_balance = db.execute("SELECT cash FROM users WHERE id = ?", user_id)
+        user_cash_balance = db.session.execute("SELECT cash FROM users WHERE id = :user_id", {"user_id":user_id})
         user_cash = user_cash_balance[0]["cash"]
 
         updated_cash = user_cash + transaction_value
-        db.execute("UPDATE users SET cash = ? WHERE id = ?", updated_cash, user_id)
+        db.session.execute("UPDATE users SET cash = :updated_cash WHERE id = :user_id", {"updated_cash" : updated_cash, "user_id" : user_id})
 
         date = datetime.datetime.now()
-        db.execute(
+        db.session.execute(
             "INSERT INTO transactions (user_id, symbol, shares, price, date, total) VALUES (?, ?, ?, ?, ?, ?)", user_id, symbol, (-1 *
                                                                                                                                   shares), stock["price"], date, transaction_value
         )
@@ -293,8 +296,8 @@ def sell():
 
     else:
         user_id = session["user_id"]
-        user_symbols = db.execute(
-            "SELECT symbol FROM transactions WHERE user_id = ? GROUP BY symbol", user_id)
+        user_symbols = db.session.execute(
+            "SELECT symbol FROM transactions WHERE user_id = :user_id GROUP BY symbol", {"user_id" : user_id})
         # return jsonify(user_symbols)
         return render_template("sell.html", user_symbols=user_symbols)
 
@@ -313,7 +316,7 @@ def change_password():
             return apology("Must Provide New Password!", 403)
         elif not confirm_password:
             return apology("Must Confirm New Password!", 403)
-        user_data = db.execute("SELECT hash FROM users WHERE id = ?", user_id)
+        user_data = db.session.execute("SELECT hash FROM users WHERE id = :user_id", {"user_id" : user_id})
         hash_old = user_data[0]["hash"]
         if not check_password_hash(hash_old, password):
             return apology("Incorrect Password!")
@@ -327,7 +330,7 @@ def change_password():
         elif not any(c.isalnum() for c in new_password):
             return apology("Password must contain letters and numbers", 403)
         new_hash = generate_password_hash(new_password)
-        db.execute("UPDATE users SET hash = ? WHERE id = ?", new_hash, user_id)
+        db.session.execute("UPDATE users SET hash = :new_hash WHERE id = ?", {"new_hash" : new_hash, "user_id" : user_id})
         redirect_message = "Password Changed!"
         return redirect("/")
         # return render_template("index.html", alert_start=alert_start, alert_end=alert_end, change_password_message=redirect_message)
@@ -348,7 +351,7 @@ def add_cash():
         if not add_cash:
             return apology("Must Provide Cash to add", 403)
         add_cash = float(add_cash)
-        hash_db = db.execute("SELECT hash FROM users WHERE id = ?", user_id)
+        hash_db = db.session.execute("SELECT hash FROM users WHERE id = :user_id", {"user_id" : user_id})
         if not check_password_hash(hash_db[0]["hash"], password):
             return apology("Incorrect Password!", 403)
         if add_cash > 10000:
