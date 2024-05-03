@@ -1,0 +1,49 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Register
+{% endblock %}
+
+{% block main %}
+    <form action="/register" method="post">
+        <div class="mb-3">
+            <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="username" placeholder="Username" type="text">
+        </div>
+        <div class="mb-3">
+            <input class="form-control mx-auto w-auto" name="password" placeholder="Password" type="password">
+        </div>
+        <div class="mb-3">
+            <input class="form-control mx-auto w-auto" name="confirmation" placeholder="Confirm Password" type="password">
+        </div>
+        <button class="btn btn-primary" type="submit">Register</button>
+    </form>
+    <div class="accordion" id="accordionExample">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOne" aria-expanded="false" aria-controls="collapseOne">
+                    Username and Password Rules
+                </button>
+            </h2>
+            <div id="collapseOne" class="accordion-collapse collapse" data-bs-parent="#accordionExample">
+                <div class="accordion-body" style="text-align: left;">
+                    <strong>Abiding to the following rules is necessary: </strong>
+                    <ul>
+                        <li><strong>Username:</strong>
+                            <ol>
+                                <li>Username must be unique</li>
+                                <li>Must be well designed</li>
+                            </ol>
+                        </li>
+                        <li><strong>Password:</strong>
+                            <ol>
+                                <li>Password must be strong</li>
+                                <li>Password must be alphanumeric and should contain special characters</li>
+                                <li>Password must contain atleast one of the special characters from !@#$%^&*()-+?_=,<>/"</li>
+                            </ol>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+{% endblock %}

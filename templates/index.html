@@ -1,0 +1,44 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Portfolio
+{% endblock %}
+
+{% block main %}
+    <div style="margin-bottom: 25px"><h2>Welcome! {{ username }} </h2></div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Shares</th>
+                    <th>Price</th>
+                    <th><strong>TOTAL</strong></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for transaction in transactions %}
+                    <tr>
+                        <td> {{ transaction.symbol }} </td>
+                        <td> {{ transaction.shares }} </td>
+                        <td> {{ transaction.price | usd}} </td>
+                        <td> {{ transaction.balance | usd}} </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td><strong>Cash</strong></td>
+                    <td><strong>{{ cash | usd}}</strong></td>
+                </tr>
+                <tr>
+
+                    <td></td>
+                    <td></td>
+                    <td><strong>TOTAL</strong></td>
+                    <td><strong><i>{{ grand_total | usd }}</i></strong></td>
+                </tr>
+            </tfoot>
+        </table>
+{% endblock %}
