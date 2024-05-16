@@ -5,7 +5,7 @@ import requests
 import urllib
 import uuid
 
-from flask import redirect, render_template, session
+from flask import redirect, render_template, request, session
 from functools import wraps
 
 
@@ -71,7 +71,7 @@ def lookup(symbol):
         response = requests.get(
             url,
             cookies={"session": str(uuid.uuid4())},
-            headers={"Accept": "*/*", "User-Agent": "python-requests"},
+            headers={"Accept": "*/*", "User-Agent": request.headers.get("User-Agent")},
         )
         response.raise_for_status()
 
@@ -86,6 +86,3 @@ def lookup(symbol):
 def usd(value):
     """Format value as USD."""
     return f"${value:,.2f}"
-
-
-
